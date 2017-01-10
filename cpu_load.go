@@ -29,6 +29,7 @@ import (
 
 const DEFAULT_BIG = 1000 * 1000 * 1000
 const DEFAULT_NGOR = 24
+const BUFFER = 4
 
 // allowed messages
 const START = "Start"
@@ -39,20 +40,19 @@ const PROGRESS = "InProgress"
 type thing float64
 
 // not using pointer as want a local copy of the thing only
-func (t thing) run(me int, big int, mychan chan string) {
-    waituntil := <-mychan
+func (t thing) run(me int, big int, two_chan chan string, cntl_chan chan string) {
+    waituntil := <-cntl_chan
     t.validate_start(waituntil)
-    fmt.Printf("%d starting\n", me)
     for n:=0; n<big; n++ {
         newt := thing(math.Sqrt(float64(t * t + thing(me))))
         if n % (big / 4) == 0 {
-            mychan <- fmt.Sprintf("%s %d %d\n", PROGRESS, me, n)
+            two_chan <- fmt.Sprintf("%s %d %d\n", PROGRESS, me, n)
             fmt.Printf("%s %d %d\n", PROGRESS, me, n)
         }
         t = newt
     }
     fmt.Printf("%d ended with final result %f\n", me, float64(t))
-    mychan <- STOP
+    two_chan <- STOP
 }
 
 func (t thing) validate_start(message string) {
@@ -82,27 +82,29 @@ func main() {
     ngor := flag.Int("n", DEFAULT_NGOR, "number of goroutines to launch")
     bignumb := flag.Int("b", DEFAULT_BIG, "number of iterations per gor")
     flag.Parse()
-    comms := make([]chan string, 0)
+    data_comms := make([]chan string, 0)
+    cntl_comms := make([]chan string, 0)
     report(fmt.Sprintf("Setting things up for %d gors", *ngor))
     for n := 0; n < *ngor; n++ {
-        comms = append(comms, make(chan string))
+        data_comms = append(data_comms, make(chan string, BUFFER))
+        cntl_comms = append(cntl_comms, make(chan string, BUFFER))
     }
     gors := make([]thing, 0)
     for n := 0; n < *ngor; n++ {
         gors = append(gors, thing(1.0 * n))
     }
     for n, t := range(gors) {
-        go t.run(n, *bignumb, comms[n])
+        go t.run(n, *bignumb, data_comms[n], cntl_comms[n])
     }
     report("Starting the gors")
     for n, _ := range(gors) {
-        comms[n] <- START
+        cntl_comms[n] <- START
     }
     report("All started - waiting for them to finish")
     var wg sync.WaitGroup
     for n, _ := range(gors) {
         wg.Add(1)
-        go validate_stream(comms[n], &wg)
+        go validate_stream(data_comms[n], &wg)
     }
     wg.Wait()
     report("All done")
