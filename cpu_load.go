@@ -100,14 +100,6 @@ func main() {
         cntl_comms[n] <- START
     }
     report("All started - waiting for them to finish")
-    /*
-    var wg sync.WaitGroup
-    for n, _ := range(gors) {
-        wg.Add(1)
-        go validate_stream(data_comms[n], &wg)
-    }
-    wg.Wait()
-    */
     wait_chan := make(chan int)
     for n, _ := range(gors) {
         go validate_stream(data_comms[n], wait_chan)
