@@ -6,8 +6,7 @@ obvious whether real parallelism is being achieved.
 Tasks are started by receiving a start token on their dedicated channel.
 Once running, tasks report progress regularly, then indicate done using a STOP token.
 A separate goroutine validates the tokens on the channels.
-A wait group is used to wait for all the token validation to complete.
-Invalid tokens cause a panic.
+An additional channel is used to wait for task completion
 
 Usage of /home/gavin/work/go/workspace/bin/cpu_load:
   -b int
